@@ -13,7 +13,7 @@ public class Import {
 
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(Import.class);
 
-    private static final String optList[] = new String[] {"a", "d", "f"};
+    private static final String optList[] = new String[] {"a", "d", "f", "s"};
 
     private static void usage(Options options) {
         new HelpFormatter().printHelp("Usage: dict-import [OPTIONS]", options);
@@ -37,6 +37,7 @@ public class Import {
         options.addOption(optList[0], true, "file extension for annotations");
         options.addOption(optList[1], true, "file extension for dictionaries");
         options.addOption(optList[2], true, "folder with the data");
+        options.addOption(optList[3], true, "sqlite database name");
 
         CommandLine commandLine = null;
         try {
@@ -58,6 +59,13 @@ public class Import {
         String dataFolder = commandLine.getOptionValue(optList[2]);
 
         List<String> dataFiles = getDictFileList(dataFolder);
+
+        Database db = new Database("test.db");
+        try {
+            db.createNewDatabase();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
 
         for (String fileName: dataFiles) {
             String fileExtention = FilenameUtils.getExtension(Paths.get(dataFolder, fileName).toString());
