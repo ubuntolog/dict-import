@@ -57,24 +57,7 @@ public class Import {
         return content;
     }
 
-    public static void importDictionary(String fileName, String description, String dbFileName) throws IOException {
-        Database db = new Database(dbFileName);
-        db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
-                + "	id integer PRIMARY KEY,\n"
-                + "	name varchar(50) NOT NULL,\n"
-                + "	description text NOT NULL,\n"
-                + "	src_lang varchar(50) NOT NULL,\n"
-                + "	target_lang varchar(50) NOT NULL\n"
-                + ");");
-
-        db.createTable( "CREATE TABLE IF NOT EXISTS entry (\n"
-                + "	id integer PRIMARY KEY,\n"
-                + "	dictionary_id integer NOT NULL,\n"
-                + "	word varchar(100) NOT NULL,\n"
-                + "	meaning text NOT NULL,\n"
-                + "	text_content text NOT NULL\n"
-                + ");");
-
+    public static void importDictionary(String fileName, String description, String dbFileName, Database db) throws IOException {
         BufferedReader br = null;
         try {
             String line;
@@ -173,6 +156,23 @@ public class Import {
         String dataFolder = commandLine.getOptionValue(optList[2]);
         String dbFileName = commandLine.getOptionValue(optList[3]);
 
+        Database db = new Database(dbFileName);
+        db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	name varchar(50) NOT NULL,\n"
+                + "	description text NOT NULL,\n"
+                + "	src_lang varchar(50) NOT NULL,\n"
+                + "	target_lang varchar(50) NOT NULL\n"
+                + ");");
+
+        db.createTable( "CREATE TABLE IF NOT EXISTS entry (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	dictionary_id integer NOT NULL,\n"
+                + "	word varchar(100) NOT NULL,\n"
+                + "	meaning text NOT NULL,\n"
+                + "	text_content text NOT NULL\n"
+                + ");");
+
         List<String> dataFiles = getDictFileList(dataFolder);
         int dictCounter = 0;
         for (String fileName: dataFiles) {
@@ -200,7 +200,8 @@ public class Import {
                 }
 
                 try {
-                    importDictionary(Paths.get(dataFolder, fileName).toString(), annotationContent, dbFileName);
+                    importDictionary(Paths.get(dataFolder, fileName).toString(), annotationContent, dbFileName, db);
+                    log.info("A new dictionary has been imported");
                 } catch (IOException e) {
                     log.error(e.getMessage());
                 }
