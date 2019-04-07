@@ -38,7 +38,9 @@ public class Database {
     }
 
     public static void insertDictionary(String name, String description, String srcLang, String targetLang) {
-        try (PreparedStatement st = dbConnection.prepareStatement("INSERT INTO dictionary (name, description, src_lang, target_lang) VALUES (?, ?, ?, ?)")) {
+        PreparedStatement st = null;
+        try {
+            st = dbConnection.prepareStatement("INSERT INTO dictionary (name, description, src_lang, target_lang) VALUES (?, ?, ?, ?)");
             st.setString(1, name);
             st.setString(2, description);
             st.setString(3, srcLang);
@@ -46,29 +48,62 @@ public class Database {
             st.executeUpdate();
         } catch (SQLException e) {
             log.error(e.getMessage());
+        } finally {
+            try {
+                st.close();
+            } catch (SQLException e) {
+                log.error(e.getMessage());
+            }
         }
     }
 
     public static int getDictLastId() {
         int number = -1;
-        try (Statement stmt = dbConnection.createStatement()) {
+        Statement stmt = null;
+        try {
+            stmt = dbConnection.createStatement();
             ResultSet rs = stmt.executeQuery("SELECT * FROM dictionary ORDER BY id DESC LIMIT 1");
             while (rs.next()) {
                 number = rs.getInt("id");
             }
+            rs.close();
+
         } catch (SQLException e) {
             log.error(e.getMessage());
+        } finally {
+            try {
+                stmt.close();
+            } catch (SQLException e) {
+                log.error(e.getMessage());
+            }
         }
         return number;
     }
 
     public static void insertEntry(Integer dictId, String word, String meaning, String textContent) {
-        try (PreparedStatement st = dbConnection.prepareStatement("INSERT INTO entry (dictionary_id, word, meaning, text_content) VALUES (?, ?, ?, ?)")) {
+        PreparedStatement st = null;
+        try {
+            st = dbConnection.prepareStatement("INSERT INTO entry (dictionary_id, word, meaning, text_content) VALUES (?, ?, ?, ?)");
             st.setInt(1, dictId);
             st.setString(2, word);
             st.setString(3, meaning);
             st.setString(4, textContent);
             st.executeUpdate();
+        } catch (SQLException e) {
+            log.error(e.getMessage());
+        } finally {
+            try {
+                st.close();
+            } catch (SQLException e) {
+                log.error(e.getMessage());
+            }
+        }
+    }
+
+    public static void closeConnection() {
+        try {
+            dbConnection.close();
+            log.info("Closing the database connection");
         } catch (SQLException e) {
             log.error(e.getMessage());
         }
