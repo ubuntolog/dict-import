@@ -1,6 +1,8 @@
 package top.alexcloud;
 
-import java.io.File;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -33,6 +35,119 @@ public class Import {
         return folderList;
     }
 
+    public static String readAnnotation(String fileName) throws IOException {
+        String content;
+        BufferedReader br = null;
+        try {
+            String line = null;
+            StringBuilder sb = new StringBuilder();
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(fileName)), StandardCharsets.UTF_16));
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+
+                sb.append(System.lineSeparator());
+            }
+            content = sb.toString();
+
+        } finally {
+            if (br != null) {
+                br.close();
+            }
+        }
+        return content;
+    }
+
+    public static void importDictionary(String fileName, String description) throws IOException {
+        Database db = new Database("test.db");
+        db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	name varchar(50) NOT NULL,\n"
+                + "	description text NOT NULL,\n"
+                + "	src_lang varchar(50) NOT NULL,\n"
+                + "	target_lang varchar(50) NOT NULL\n"
+                + ");");
+
+        db.createTable( "CREATE TABLE IF NOT EXISTS entry (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	dictionary_id integer NOT NULL,\n"
+                + "	word varchar(100) NOT NULL,\n"
+                + "	meaning text NOT NULL,\n"
+                + "	text_content text NOT NULL\n"
+                + ");");
+
+        BufferedReader br = null;
+        try {
+            String line;
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(fileName)), StandardCharsets.UTF_16));
+            Integer counter = 0;
+            int lastId = 0;
+            String currentWord = "";
+            String currentMeaning = "";
+            String currentTextContent = "";
+
+            String dictName = "";
+            String srcLanguage = "";
+            String targetLanguage = "";
+
+            while ((line = br.readLine()) != null) {
+                counter++;
+
+                if (counter.equals(1)) {
+                    dictName = line;
+                    dictName = dictName.replaceAll("(?i)#NAME", "");
+                    dictName = dictName.trim();
+                    dictName = dictName.substring(1, dictName.length()-1);
+                    log.info("Name: " + dictName);
+                }
+
+                if (counter.equals(2)) {
+                    srcLanguage = line;
+                    srcLanguage = srcLanguage.replaceAll("(?i)#INDEX_LANGUAGE", "");
+                    srcLanguage = srcLanguage.trim();
+                    srcLanguage = srcLanguage.substring(1, srcLanguage.length()-1);
+                    log.info("Source language: " + srcLanguage);
+                }
+
+                if (counter.equals(3)) {
+                    targetLanguage = line;
+                    targetLanguage = targetLanguage.replaceAll("(?i)#CONTENTS_LANGUAGE", "");
+                    targetLanguage = targetLanguage.trim();
+                    targetLanguage = targetLanguage.substring(1, targetLanguage.length()-1);
+                    log.info("Target language: " + targetLanguage);
+
+                    db.insertDictionary(dictName, description, srcLanguage, targetLanguage);
+                    lastId = db.getDictLastId();
+                }
+
+                if (counter > 3) {
+
+                    if (Character.isWhitespace(line.charAt(0))) {
+                        System.out.println(line + " - White space");
+                        line = line.trim();
+                        currentMeaning = currentMeaning + "\n" + line;
+                        currentTextContent = currentMeaning.replaceAll("\\[.*?\\]", "").trim();
+                    } else {
+                        if ((currentWord.length()>0) && (currentMeaning.length()>0)) {
+                            db.insertEntry(lastId, currentWord, currentMeaning, currentTextContent);
+                            currentWord = "";
+                            currentMeaning = "";
+                            currentTextContent = "";
+                        }
+                        currentWord = line;
+                        System.out.println(line);
+                    }
+                }
+            }
+            if ((currentWord.length()>0) && (currentMeaning.length()>0)) {
+                db.insertEntry(lastId, currentWord, currentMeaning, currentTextContent);
+            }
+        } finally {
+            if (br != null) {
+                br.close();
+            }
+        }
+    }
+
     public static void main(String[] args) {
         Options options = new Options();
         options.addOption(optList[0], true, "file extension for annotations");
@@ -60,46 +175,35 @@ public class Import {
         String dataFolder = commandLine.getOptionValue(optList[2]);
 
         List<String> dataFiles = getDictFileList(dataFolder);
-
-
-        Database db = new Database("test.db");
-        db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
-                + "	id integer PRIMARY KEY,\n"
-                + "	name varchar(50) NOT NULL,\n"
-                + "	description text NOT NULL,\n"
-                + "	src_lang varchar(50) NOT NULL,\n"
-                + "	target_lang varchar(50) NOT NULL\n"
-                + ");");
-
-        db.createTable( "CREATE TABLE IF NOT EXISTS entry (\n"
-                + "	id integer PRIMARY KEY,\n"
-                + "	dictionary_id integer NOT NULL,\n"
-                + "	word varchar(100) NOT NULL,\n"
-                + "	meaning text NOT NULL,\n"
-                + "	text_content text NOT NULL\n"
-                + ");");
-
-
-        db.insertDictionary("name", "desctr", "Rus", "German");
-        int lastId = db.getDictLastId();
-        System.out.println("Last = "+ lastId);
-
-
-        db.insertEntry(lastId, "word", "meaning", "plain text");
-
-
+        int dictCounter = 0;
         for (String fileName: dataFiles) {
             String fileExtention = FilenameUtils.getExtension(Paths.get(dataFolder, fileName).toString());
             String fileBaseName = FilenameUtils.getBaseName(Paths.get(dataFolder, fileName).toString());
 
             if (fileExtention.toLowerCase().equals(dictExtension)) {
-                System.out.println("Dict " + fileName);
+                log.info("Dictionary detected: " + fileName);
 
-                File annFile = new File(Paths.get(dataFolder, fileBaseName + "." + annExtension).toString());
+                // Skip dictionaries with any description
+                String annotationPath = Paths.get(dataFolder, fileBaseName + "." + annExtension).toString();
+                File annFile = new File(annotationPath);
                 if (!annFile.exists()) {
                     log.info(fileBaseName + " does not have any annotation file, skipping this dictionary");
                     continue;
                 }
+
+                String annotationContent = "";
+                try {
+                    annotationContent = readAnnotation(annotationPath);
+                } catch (IOException e) {
+                    log.error(e.getMessage());
+                }
+
+                try {
+                    importDictionary(Paths.get(dataFolder, fileName).toString(), annotationContent);
+                } catch (IOException e) {
+                    log.error(e.getMessage());
+                }
+
             }
         }
 
