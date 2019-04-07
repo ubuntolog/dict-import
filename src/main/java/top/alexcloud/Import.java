@@ -2,6 +2,7 @@ package top.alexcloud;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,23 +61,43 @@ public class Import {
 
         List<String> dataFiles = getDictFileList(dataFolder);
 
+
         Database db = new Database("test.db");
-        try {
-            db.createNewDatabase();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
+        db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	name varchar(50) NOT NULL,\n"
+                + "	description text NOT NULL,\n"
+                + "	src_lang varchar(50) NOT NULL,\n"
+                + "	target_lang varchar(50) NOT NULL\n"
+                + ");");
+
+        db.createTable( "CREATE TABLE IF NOT EXISTS entry (\n"
+                + "	id integer PRIMARY KEY,\n"
+                + "	dictionary_id integer NOT NULL,\n"
+                + "	word varchar(100) NOT NULL,\n"
+                + "	meaning text NOT NULL,\n"
+                + "	text_content text NOT NULL\n"
+                + ");");
+
+
+        db.insertDictionary("name", "desctr", "Rus", "German");
+        int lastId = db.getDictLastId();
+        System.out.println("Last = "+ lastId);
+
+
+        db.insertEntry(lastId, "word", "meaning", "plain text");
+
 
         for (String fileName: dataFiles) {
             String fileExtention = FilenameUtils.getExtension(Paths.get(dataFolder, fileName).toString());
             String fileBaseName = FilenameUtils.getBaseName(Paths.get(dataFolder, fileName).toString());
-            System.out.println(fileExtention);
+
             if (fileExtention.toLowerCase().equals(dictExtension)) {
                 System.out.println("Dict " + fileName);
 
                 File annFile = new File(Paths.get(dataFolder, fileBaseName + "." + annExtension).toString());
                 if (!annFile.exists()) {
-                    log.info(fileBaseName + " does not have an annotation file, skipping this dictionary");
+                    log.info(fileBaseName + " does not have any annotation file, skipping this dictionary");
                     continue;
                 }
             }
