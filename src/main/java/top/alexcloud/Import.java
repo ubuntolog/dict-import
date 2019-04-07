@@ -57,8 +57,8 @@ public class Import {
         return content;
     }
 
-    public static void importDictionary(String fileName, String description) throws IOException {
-        Database db = new Database("test.db");
+    public static void importDictionary(String fileName, String description, String dbFileName) throws IOException {
+        Database db = new Database(dbFileName);
         db.createTable( "CREATE TABLE IF NOT EXISTS dictionary (\n"
                 + "	id integer PRIMARY KEY,\n"
                 + "	name varchar(50) NOT NULL,\n"
@@ -122,7 +122,6 @@ public class Import {
                 if (counter > 3) {
 
                     if (Character.isWhitespace(line.charAt(0))) {
-                        System.out.println(line + " - White space");
                         line = line.trim();
                         currentMeaning = currentMeaning + "\n" + line;
                         currentTextContent = currentMeaning.replaceAll("\\[.*?\\]", "").trim();
@@ -134,7 +133,6 @@ public class Import {
                             currentTextContent = "";
                         }
                         currentWord = line;
-                        System.out.println(line);
                     }
                 }
             }
@@ -173,10 +171,13 @@ public class Import {
         String annExtension = commandLine.getOptionValue(optList[0]);
         String dictExtension = commandLine.getOptionValue(optList[1]);
         String dataFolder = commandLine.getOptionValue(optList[2]);
+        String dbFileName = commandLine.getOptionValue(optList[3]);
 
         List<String> dataFiles = getDictFileList(dataFolder);
         int dictCounter = 0;
         for (String fileName: dataFiles) {
+            dictCounter++;
+            log.info("File " + dictCounter + " out of " + dataFiles.size());
             String fileExtention = FilenameUtils.getExtension(Paths.get(dataFolder, fileName).toString());
             String fileBaseName = FilenameUtils.getBaseName(Paths.get(dataFolder, fileName).toString());
 
@@ -199,7 +200,7 @@ public class Import {
                 }
 
                 try {
-                    importDictionary(Paths.get(dataFolder, fileName).toString(), annotationContent);
+                    importDictionary(Paths.get(dataFolder, fileName).toString(), annotationContent, dbFileName);
                 } catch (IOException e) {
                     log.error(e.getMessage());
                 }
